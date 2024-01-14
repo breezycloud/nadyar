@@ -13,6 +13,9 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
+    - name: Install WASM workloads
+      run: dotnet workload install wasm-tools
+    
     - name: Publish app
       run: dotnet publish -c Release
 
@@ -20,7 +23,7 @@ jobs:
       uses: SteveSandersonMS/ghaction-rewrite-base-href@v1
       with:
         html_path: ${{ env.PUBLISH_DIR }}/index.html
-        base_href: /myportfolio/
+        base_href: /nadyar/
 
     - name: GitHub Pages
       if: success()
