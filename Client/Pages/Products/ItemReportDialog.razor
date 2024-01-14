@@ -1,0 +1,171 @@
+﻿@using Client.Reports;
+@using BlazorDexie.JsModule
+@inject LayoutService LayoutService
+@inject IJSRuntime js
+@if (AppState.IsBusy)
+{
+    <Loader/>
+}
+else
+{
+    <MudDialog>
+        <TitleContent>
+            <MudText Typo="Typo.h6">Items Report</MudText>
+        </TitleContent>
+        <DialogContent>
+            <MudGrid Class="pa-3" Spacing="2">
+                <MudItem xs="12" Class="d-flex align-center justify-center">
+                    <MudRadioGroup @bind-SelectedOption="SelectedOption">
+                        <MudRadio Color="Color.Tertiary" Option="@("All")">Category</MudRadio>
+                        <MudRadio Color="Color.Secondary" Option="@("Selected")">Product</MudRadio>
+                    </MudRadioGroup>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudSelect Dense="true" AnchorOrigin="Origin.BottomCenter" Strict="true" T="Guid"
+                           Label="Category" Value="Category.Id" Variant="Variant.Outlined" ValueChanged="@CategoryValueChanged">
+                        @foreach (Category category in AppState.Categories)
+                        {
+                            <MudSelectItem Value="@category.Id">@category.CategoryName</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12">
+                    @if (SelectedOption == "Selected")
+                    {
+                        <MudSelect Dense="true" AnchorOrigin="Origin.BottomCenter" Strict="true" T="Item"
+                           Label="Item" Variant="Variant.Outlined" Value="@Item" ValueChanged="@ItemValueChanged">
+                            @foreach (Item item in items)
+                            {
+                                <MudSelectItem Value="@item">@item.ItemName</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
+                </MudItem>
+            </MudGrid>
+        </DialogContent>
+        <DialogActions>
+            <MudButton Disabled="AppState.IsProcessing" OnClick="GetReportItems" ButtonType="ButtonType.Submit" Variant="Variant.Filled"
+                   Color="Color.Primary">@(AppState.IsProcessing ? "Processing" : "Download")</MudButton>
+        </DialogActions>
+    </MudDialog>
+}
+
+@code {
+    private string? SelectedOption { get; set; } = "All";
+    private Category Category { get; set; } = new();
+    protected override async Task OnInitializedAsync()
+    {
+        AppState!.IsBusy = true;
+        await Task.Delay(300);
+        moduleFactory = new EsModuleFactory(js);
+        await LoadItems();
+        AppState!.IsBusy = false;
+    }
+    EsModuleFactory? moduleFactory;
+    async Task LoadItems()
+    {
+        var db = new MyDb(moduleFactory!);
+        try
+        {
+            AppState.Categories = await db.Categories.OrderBy(nameof(Category.CategoryName)).ToArray();
+            AppState.Products = await db.Items.OrderBy(nameof(Item.ItemName)).ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+        finally
+        {
+            await db.DisposeAsync();
+        }
+    }
+
+    Item[] items { get; set; } = Array.Empty<Item>();
+    void CategoryValueChanged(Guid category)
+    {
+        items = AppState.Products.Where(x => x.Category!.Id == category).OrderBy(x => x.ItemName).ToArray();
+        Category = AppState.Categories.FirstOrDefault(x => x.Id == category)!;
+    }
+
+    Item? Item = null;
+    void ItemValueChanged(Item item)
+    {
+        Item = item;
+    }
+    async Task GetReportItems()
+    {
+        AppState.IsProcessing = true;
+        if (SelectedOption == string.Empty)
+        {
+            SnackBar.Add("Select Report Option", Severity.Warning);
+            AppState.IsProcessing = false;
+            return;
+        }
+        else if (SelectedOption == "All" && Category.Id == Guid.Empty)
+        {
+            SnackBar.Add("Select Category", Severity.Warning);
+            AppState.IsProcessing = false;
+            return;
+        }
+        else if (SelectedOption == "Selected" && Item is null)
+        {
+            SnackBar.Add("Select Item", Severity.Warning);
+            AppState.IsProcessing = false;
+            return;
+        }
+        string? reportHeader = string.Empty;
+        var db = new MyDb(moduleFactory!);
+        Item[] products = await db.Items.ToArray();
+        try
+        {
+            List<ItemsReportModel>? data = null;
+            if (SelectedOption == "All")
+            {
+                reportHeader = Category.CategoryName;                
+                data = products.GroupBy(x => x.Category!.Id).Select(x => new ItemsReportModel
+                {
+                    ItemName = x.Select(x => x!.ItemName).First(),
+                    Category = x.Select(x => x!.Category!.CategoryName).First(),
+                    BuyPrice = x.Select(x => x!.BuyPrice).First()!.Value,
+                    SellPrice = x.Select(x => x!.SellPrice).First()!.Value,
+                    CurrentQty = x.Select(x => x!.Quantity)!.First()!.Value,
+                    SoldQty = x.SelectMany(s => s.StocksOut!).Sum(x => x.Quantity!.Value)
+                }).ToList();
+            }
+            else
+            {
+                reportHeader = $"{Category!.CategoryName!.ToUpper()}";                
+                data = products.Where(x => x.Id == Item!.Id)
+                                 .GroupBy(x => x.Id)
+                                 .Select(x => new ItemsReportModel
+                                 {
+                                         ItemName = x.Select(x => x!.ItemName).First(),
+                                         Category = x.Select(x => x!.Category!.CategoryName).First(),
+                                         BuyPrice = x.Select(x => x!.BuyPrice).First()!.Value,
+                                         SellPrice = x.Select(x => x!.SellPrice).First()!.Value,
+                                         CurrentQty = x.Select(x => x!.Quantity)!.First()!.Value,
+                                         SoldQty = x.SelectMany(s => s.StocksOut!).Sum(x => x.Quantity!.Value)
+                                 }).ToList();                
+            }
+
+            if (data is null)
+            {
+                SnackBar.Add("No data found", Severity.Warning);
+                AppState.IsProcessing = false;
+                return;
+            }
+            var report = new ItemsReport(data, reportHeader);
+            var bytes = report.Create();
+            await js.InvokeVoidAsync("exportFile", $"Items Report {DateTime.Now.Ticks}.pdf", Convert.ToBase64String(bytes));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+        finally
+        {
+            await db.DisposeAsync();            
+        }
+        AppState.IsProcessing = false;
+    }
+}

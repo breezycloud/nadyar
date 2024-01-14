@@ -1,0 +1,41 @@
+﻿@inject LayoutService LayoutService
+
+<MudTooltip Duration="1000" Text="@(LayoutService!.IsDarkMode ? "Switch to Light Theme" : "Switch to Dark Theme")">
+    <MudIconButton Icon="@(LayoutService.IsDarkMode ? @Icons.Material.Rounded.LightMode : @Icons.Material.Outlined.DarkMode)"
+                   Color="Color.Inherit" OnClick="@LayoutService.ToggleDarkMode" />
+</MudTooltip>
+
+@code {
+    Guid id { get; set; }
+    string image { get; set; } = string.Empty;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            id = await localStorage.GetItemAsync<Guid>("uid");            
+        }
+        image = await localStorage.GetItemAsync<string>("image");
+        if (!string.IsNullOrEmpty(image))
+        {
+            string imageFormat = await localStorage.GetItemAsync<string>("format");
+            string defaultImage = string.Format("data:image/{0};base64,{1}", imageFormat, image);
+            image = defaultImage;
+        }        
+    }
+    async void Navigate()
+    {
+        var userID = await localStorage.GetItemAsync<string>("uid");
+        nav.NavigateTo($"/manageuser/{userID}");
+
+    }
+
+    private async Task LogOut()
+    {
+        await localStorage.RemoveItemAsync("token");
+        await localStorage.RemoveItemAsync("uid");
+        await localStorage.RemoveItemAsync("image");
+        await localStorage.RemoveItemAsync("format");
+        nav.NavigateTo("/", true);
+    }
+}

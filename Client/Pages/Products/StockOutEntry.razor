@@ -1,0 +1,245 @@
+﻿@layout AppLayout
+@page "/stockout"
+@inject IJSRuntime js
+@using BlazorDexie.JsModule
+@using Client.Reports;
+@using System.Globalization
+@inject LayoutService LayoutService
+
+@if (AppState.IsBusy)
+{
+    <LoaderRows />
+}
+else
+{
+        <MudGrid Spacing="2">
+            <MudItem xs="12" sm="6">
+                <MudGrid>
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudTextField @bind-Value="DateText" Format="dd/MM/yyy" Label="Date" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="8">
+                        <MudSelect T="Branch" Dense="true" AnchorOrigin="Origin.BottomCenter" Strict="true" Value="Branch" ValueChanged="BranchChanged" Label="Branch" Variant="Variant.Outlined">
+                            @foreach (Branch item in Branches)
+                            {
+                                <MudSelectItem Value="@item">@item.BranchName</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>                        
+                    <MudItem xs="12">
+                        <MudAutocomplete T="Item" AnchorOrigin="Origin.BottomCenter" Value="Item" Label="Items" ValueChanged="ItemChanged"
+                                    SearchFunc="@SearchItems" Dense Variant="Variant.Outlined" ShowProgressIndicator
+                                    ProgressIndicatorColor="Color.Primary" ToStringFunc="@(e => e==null ? null : $"{e.ItemName}")" />
+                    </MudItem>     
+                    <MudItem xs="12" sm="6">
+                        <MudNumericField id="figure-center" T="int" Immediate @bind-Value="@Quantity" Label="Quantity" Min="1" Max="MaxQuantity" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" Class="d-flex justify-center align-center">
+                        <MudFab Color="Color.Dark" Label="Add Item" Style="width:200px;"
+                             OnClick="@(() => AddItem())" Size="Size.Medium" EndIcon="@Icons.Material.Filled.Add" />
+                    </MudItem>                    
+                <MudItem xs="12" sm="6" Class="d-flex justify-center align-center mt-3">
+                    <MudFab Color="Color.Secondary" Label="Back" Style="width:200px;"
+                            OnClick="@(() => nav.NavigateTo("/"))" Size="Size.Medium" EndIcon="@Icons.Material.Filled.ArrowBack" />
+                </MudItem>
+                <MudItem xs="12" sm="6" Class="d-flex justify-center align-center mt-3">
+                    <MudFab Color="Color.Primary" Label="@(AppState.IsProcessing ? "Processing" : "Save")" Style="width:200px;"
+                            Disabled="@AppState.IsProcessing" OnClick="CheckOut" Size="Size.Medium" EndIcon="@Icons.Material.Filled.Check" />
+                </MudItem>
+                </MudGrid>
+            </MudItem>
+            <MudItem xs="12" sm="6" Style="max-height: 455px; overflow-y:auto">
+                @* <MudContainer Style="max-height: 455px; overflow-y:auto">                    
+                </MudContainer> *@
+                 @if (!AppState!.StockOut!.Any())
+                {
+                    <div class="d-flex align-center justify-center">
+                        <MudIcon Color="Color.Warning" Icon="@Icons.Material.Filled.ShoppingCart"
+                                 Size="Size.Large" Style="width:200px;height:200px" />
+                    </div>
+                    <MudText Align="Align.Center" Color="Color.Dark" Typo="Typo.body1">Empty List</MudText>
+
+                }
+                else
+                {
+                    <div class="d-flex flex-column align-start justify-center gap-2">
+                        @foreach (var row in AppState!.StockOut!)
+                        {
+                            <StockOutItems Item="@row" RefreshUI="@RefreshUI" />
+                        }
+                    </div>
+                }
+            </MudItem>
+        </MudGrid>
+
+}
+@code {
+    public Item Item { get; set; } = new();
+    public Item[] Items = [];
+    public Stock stock { get; set; } = new();    
+
+    public Branch[] Branches = [];
+    private Branch? Branch { get; set; }
+
+    private string DateText { get; set; } = DateTime.Now.ToString("dd/MM/yyyy");    
+    private decimal? AmountPaid { get; set; }
+    EsModuleFactory? moduleFactory;
+    DateTime currentDate = DateTime.Now;
+    private int Quantity { get; set; }
+    private int MaxQuantity { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {        
+        LayoutService.CurrentMenu = "New Order";
+        LayoutService.OnMajorUpdateOccured();
+        AppState.IsBusy = true;
+        await Task.Delay(300);
+        moduleFactory = new EsModuleFactory(js);
+        await LoadItems();
+        AppState.IsBusy = false;
+    }
+
+    async Task LoadItems()
+    {
+        var db = new MyDb(moduleFactory!);        
+        try
+        {            
+            Branches = await db.Branches.OrderBy("BranchName").ToArray();
+            Branch = Branches.FirstOrDefault();
+        }
+        catch (Exception)
+        {
+
+            throw;
+        }
+    }
+
+    void BranchChanged(Branch branch)
+    {
+        Branch = branch;
+        AppState.Products = new();
+        StateHasChanged();
+    }
+
+    private async Task<List<Item>> GetItems(Guid BranchID)
+    {
+        var db = new MyDb(moduleFactory!);
+        var items = await db.Items.Where("BranchID").IsEqual(BranchID).ToArray();
+        AppState.Products = items.Where(x => x.Quantity >= 1).OrderByDescending(x => x.ModifiedTicks).ToList();
+        return AppState.Products;
+
+    }
+
+    private void ItemChanged(Item item)
+    {
+        Item = item;
+        MaxQuantity = Item.Quantity!.Value;
+        StateHasChanged();
+    }
+
+    private async Task<IEnumerable<Item>?> SearchItems(string value)
+    {
+        try
+        {
+            await Task.Delay(500);
+            if (!AppState.Products.Any())
+                AppState.Products = await GetItems(Branch!.Id);
+
+            if (string.IsNullOrEmpty(value))
+                return AppState.Products.Where(x => x.Quantity >= 1);
+
+            return AppState.Products!.Where(x => x.ItemName!.Contains(value, StringComparison.InvariantCultureIgnoreCase) && x.Quantity >= 1);
+        }
+        catch (System.Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+        return new HashSet<Item>();
+    }         
+
+    Stock GetStock(Item item, DateOnly date)
+    {
+        return new Stock
+        {
+            Id = Guid.NewGuid(),
+            Date = date,
+            Quantity = Quantity,
+            ModifiedTicks = DateTime.Now.Ticks
+        };
+    }
+
+    void AddItem()
+    {
+        if (Item is null)
+            return;
+        if (Item.Quantity < Quantity || Quantity > Item.Quantity || Quantity == 0)
+        {
+            SnackBar.Add("Enter valid quantity", Severity.Warning);
+            return;
+        }
+        CultureInfo provider = CultureInfo.InvariantCulture;
+        var d = DateTime.ParseExact(DateText, "dd/MM/yyyy", provider);
+        Console.WriteLine(d);
+        var date = DateOnly.FromDateTime(d);
+        Item!.Quantity -= Quantity;
+
+        if (AppState.StockOut.Any(x => x.Id == Item.Id))
+        {
+            AppState.StockOut.First(x => x.Id == Item.Id).StocksOut!.Where(x => x.Date == date).First().Quantity += Quantity;
+        }
+        else
+        {
+            var stock = GetStock(Item, date);
+            Item.StocksOut!.Add(stock);
+            AppState.StockOut.Add(Item);
+        }
+        Item = null!;
+        Quantity = 0;
+        StateHasChanged();
+    }
+    async Task CheckOut()
+    {
+        AppState!.IsProcessing = true;
+        if (CheckOutValidation().Any())
+        {
+            AppState!.IsProcessing = false;
+            return;
+        }        
+        var prompt = await Dialog.ShowMessageBox("Confirmation", "Do you wish to check out item(s)", yesText: "Yes", noText: "No");
+        if (prompt is null || !prompt.Value)
+        {
+            AppState!.IsProcessing = false;
+            return;
+        }
+        var db = new MyDb(moduleFactory!);
+        try
+        {            
+            long currentTicks = currentDate.Ticks;            
+            await db.Items.BulkPut(AppState.StockOut);
+            SnackBar.Add("Data Successfully Saved", Severity.Success);
+            AppState.StockOut = new();
+        }
+        catch(Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+        finally
+        {
+            await db.DisposeAsync();
+            AppState!.IsProcessing = false;
+        }
+    }
+    public List<string> CheckOutValidation()
+    {
+        List<string> errors = new();        
+        if (AppState.StockOut!.Count == 0)
+        {
+            SnackBar.Add("Cart is empty", Severity.Warning);
+        }        
+        return errors;
+    }
+    void RefreshUI() {        
+        StateHasChanged();
+    }
+
+}

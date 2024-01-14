@@ -1,0 +1,47 @@
+﻿<MudCard Outlined="true" Style="width:350px">
+    <MudCardContent>        
+        <MudStack Row="true" Spacing="2" Justify="Justify.SpaceBetween">
+            <strong>@Item!.ItemName</strong>
+            <MudTooltip Duration="1000" Text="Remove Item">
+                <MudIconButton Color="Color.Error" OnClick="@(() => RemoveItem(Item!))" Icon="@Icons.Material.Filled.Delete" Size="Size.Small" />
+            </MudTooltip>
+        </MudStack>
+        <MudStack Spacing="2" Justify="Justify.SpaceBetween">
+            <MudText Typo="Typo.body2">
+                <span><strong>Quantity:</strong>@(Item!.StocksOut!.OrderByDescending(x => x.Date).First().Quantity)</span>                
+            </MudText>
+            <MudText Typo="Typo.body2">
+                <strong>Available Quantity:</strong> @(Item!.Quantity)
+            </MudText>
+        </MudStack>
+    </MudCardContent>
+</MudCard>
+
+
+@code {
+    [Parameter]
+    public Item? Item { get; set; } = new();    
+
+    public Stock? Stock { get; set; } = default!;
+
+    [Parameter] public EventCallback RefreshUI { get; set; }    
+
+    private async void RemoveItem(Item item)
+    {
+        var prompt = await Dialog.ShowMessageBox("Confirmation", "Do you wish to remove item", yesText: "Yes", noText: "No");
+        if (prompt is null || !prompt.Value)
+            return;
+
+        Stock = item!.StocksOut!.OrderByDescending(x => x.Date).Last();
+        AppState!.Products!.Where(x => x.Id == item.Id).First().Quantity += Stock.Quantity;
+        item.StocksOut!.Remove(Stock);
+        AppState!.StockOut!.Remove(item);
+        var product = AppState!.Products!.Where(x => x.Id == item.Id).First();
+        Console.WriteLine(product.Quantity);
+        UpdateUI();
+    }
+
+    void UpdateUI() => RefreshUI.InvokeAsync();
+
+}
+

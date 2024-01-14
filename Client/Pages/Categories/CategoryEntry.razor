@@ -1,0 +1,86 @@
+@using BlazorDexie.JsModule
+@inject IJSRuntime js
+
+<EditForm Model="Category" OnValidSubmit="Save">
+    <DataAnnotationsValidator/>    
+    <MudDialog>
+        <TitleContent>
+            <MudText Typo="Typo.h6">@string.Format("{0} Category", isAdd ? "Add" : "Edit")</MudText>
+        </TitleContent>
+        <DialogContent>
+            <MudGrid Spacing="2">
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="Category.CategoryName" Label="Category Name"
+                        Variant="Variant.Outlined" For="@(() => Category.CategoryName)"></MudTextField>      
+                </MudItem>
+                <MudItem xs="12">                        
+                    <MudTextField @bind-Value="Category.Description" Label="Description" Lines="4" Variant="Variant.Outlined"></MudTextField>      
+                </MudItem>                      
+            </MudGrid>
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="Cancel">Close</MudButton>
+            <MudButton Disabled="AppState.IsProcessing"ButtonType="ButtonType.Submit" Variant="Variant.Filled" 
+                Color="Color.Primary" >@(AppState.IsProcessing ? "Processing" : "Save")</MudButton>
+        </DialogActions>
+    </MudDialog>    
+</EditForm>
+
+    @code {
+    [CascadingParameter] MudDialogInstance? MudDialog { get; set; }    
+    [Parameter] public Category Category { get; set; } = new();            
+    [Parameter] public bool isAdd { get; set; } = true;
+    EsModuleFactory? moduleFactory;
+    protected override void OnInitialized()
+    {
+        moduleFactory = new EsModuleFactory(js);
+        base.OnInitialized();
+    }
+    void Cancel() => nav.NavigateTo("categories");
+    async Task Save()
+    {
+        AppState.IsProcessing = true;
+        var result = await Dialog.ShowMessageBox("Confirmation",
+        $"Do you wish to save", yesText: "Yes", cancelText: "No");
+        if (result is null)
+        {
+            AppState.IsProcessing= false;
+            return;        
+        }
+        else if (!result.Value)
+        {
+            AppState.IsProcessing = false;
+            return;
+        }
+
+        var db = new MyDb(moduleFactory!);
+        try
+        {
+            Category.CategoryName = StringConverter.ConvertToTitleCase(Category!.CategoryName!);
+            Category.Description = string.IsNullOrEmpty(Category.Description!) ? "" : StringConverter.ConvertToTitleCase(Category.Description!);
+            Category.ModifiedDate = DateTime.Now;
+            if (isAdd)
+            {
+                Category.Id = Guid.NewGuid();
+                await db.Categories.Put(Category);
+                Category = new();
+            }
+            else
+            {
+                await db.Categories.Put(Category, Category.Id);
+            }
+            await db.DisposeAsync();
+            SnackBar.Add("Category Successfully Saved", Severity.Success);
+            AppState.UpdateLayout();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"{ex.Message} {ex.InnerException} {ex.StackTrace} {ex.Source}");
+            SnackBar.Add("Operation failed", Severity.Error);            
+        }
+        finally
+        {
+            AppState.IsProcessing = false;
+        }
+    }    
+}

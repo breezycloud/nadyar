@@ -1,0 +1,97 @@
+@using BlazorDexie.JsModule
+@inject LayoutService LayoutService
+@inject IJSRuntime js
+
+<EditForm EditContext="context" OnValidSubmit="Save">
+    <DataAnnotationsValidator/>    
+    <MudDialog>
+        <TitleContent>
+            <MudText Typo="Typo.h6">Add Stock</MudText>
+        </TitleContent>
+        <DialogContent>
+            <MudGrid>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="Product.ItemName" Label="Product Name" ReadOnly="true" Variant="Variant.Outlined"></MudTextField>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField Value="@(Product!.Quantity + stock!.Quantity)" ReadOnly="true" Label="Current Stock" Variant="Variant.Outlined"></MudTextField>
+                </MudItem>            
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="stock.Quantity" Immediate="true" Label="New Stock" Variant="Variant.Outlined"></MudNumericField>
+                </MudItem>            
+            </MudGrid>
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="Cancel">Close</MudButton>
+            <MudButton Disabled="isProcessing"ButtonType="ButtonType.Submit" Variant="Variant.Filled" 
+                Color="Color.Primary" >@(isProcessing ? "Processing" : "Save")</MudButton>
+        </DialogActions>
+    </MudDialog>    
+</EditForm>
+
+@code {
+    [CascadingParameter] MudDialogInstance? MudDialog { get; set; }
+    [Parameter] public Item Product { get; set; } = new();
+    [Parameter] public Stock stock { get; set; } =new();
+    [Parameter] public bool isAdd { get; set; } = true;
+
+    private bool isProcessing = false;
+    EditContext? context = null;
+    EsModuleFactory? moduleFactory;
+
+    protected override void OnParametersSet()
+    {    
+        moduleFactory = new EsModuleFactory(js);
+        context = new EditContext(stock);
+    }
+    void Cancel() => MudDialog!.Close(DialogResult.Ok(true));
+    async Task Save()
+    {
+        isProcessing = true;
+        var result = await Dialog.ShowMessageBox("Confirmation",
+        $"Do you wish to save", yesText: "Yes", cancelText: "No");
+        if (result is null)
+        {
+            isProcessing= false;
+            return;        
+        }
+        else if (!result.Value)
+        {
+            isProcessing = false;
+            return;
+        }
+        var db = new MyDb(moduleFactory!);
+        try
+        {
+            DateTime currentDate = DateTime.Now;
+            long currentTicks = currentDate.Ticks;
+            if (isAdd)
+            {
+                stock.Id = Guid.NewGuid();
+                Product.Quantity += stock.Quantity;
+                Product.ModifiedTicks = currentDate;
+                stock.Date = DateOnly.FromDateTime(currentDate);   
+                Product!.StocksIn!.Add(stock);
+                await db.Items.Put(Product);
+            }
+            else
+            {
+                //await AppState!.Context!.Stocks.Where(x => x.Id == stock.Id).ExecuteUpdateAsync(x => x.SetProperty(i => i.Quantity, stock.Quantity).SetProperty(i => i.ModifiedTicks, currentTicks));
+            }         
+            //await ProductService.AddStock()
+            SnackBar.Add("Stock Successfully Saved", Severity.Success);
+            AppState.UpdateLayout();
+            stock!.Quantity = 0;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            SnackBar.Add("Operation failed", Severity.Error);            
+        }
+        finally
+        {
+            await db.DisposeAsync();
+            isProcessing = false;
+        }
+    }
+}

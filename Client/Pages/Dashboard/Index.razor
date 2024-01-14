@@ -1,0 +1,57 @@
+﻿@layout AppLayout
+@page "/dashboard"
+@using Client.Data.AppService
+@inject IAppService AppService
+@inject LayoutService LayoutService
+@inject IJSRuntime js
+
+
+<PageTitle>Dashboard</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12">
+        <TopChartsView IsLoading="@model.IsBusy" Branches="@model.TotalBranches"
+                       Categories="@model.Categories"
+                       AvailableProducts="@model.AvailableProducts" SoldProducts="@model.SoldProducts" />
+    </MudItem>
+    <MudItem xs="12" sm="6">
+        <ItemLineChartView IsLoading="@model.IsBusy" Data="@model.ItemSales" />
+    </MudItem>
+    <MudItem xs="12" sm="6">
+        @* <ServiceTopSales IsLoading="@model.IsBusy" Data="@model.Items" /> *@
+    </MudItem>
+    @*<MudItem xs="12" sm="6" md="4">
+    <ServiceTopCustomer IsLoading="@model.IsBusy" customer="@model.ServiceTopCustomer" />
+    </MudItem>*@
+    <MudItem xs="12" sm="6" md="4">
+        @*<ProductsLineChartView IsLoading="@model.IsBusy" Data="@model.ProductSales" />*@
+    </MudItem>
+    <MudItem xs="12" sm="6" md="4">
+        @*<ProductTopSold IsLoading="@model.IsBusy" Data="@model.ProductPieChart" />*@
+    </MudItem>
+    <MudItem xs="12" sm="6" md="4">
+        @*<ProductTopCustomer IsLoading="@model.IsBusy" customer="@model.ProductTopCustomer" />*@
+    </MudItem>
+
+</MudGrid>
+
+
+@code {
+    DashboardModel model = new();
+    protected override async Task OnInitializedAsync()
+    {
+        LayoutService.CurrentMenu = "Dashboard";
+        LayoutService.OnMajorUpdateOccured();
+        model.IsBusy = true;
+        await Task.Delay(500);
+        // await AppService.SeedData();
+        model = await AppService.GetDashboard();
+        model.IsBusy = false;
+    }
+
+    async Task Delete()
+    {
+        await js.InvokeVoidAsync("deleteDatabase");
+    }
+
+}

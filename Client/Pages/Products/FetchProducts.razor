@@ -1,0 +1,183 @@
+@layout AppLayout
+@page "/products"
+@using BlazorDexie.JsModule
+@inject LayoutService LayoutService
+@inject IJSRuntime js
+@implements IDisposable
+
+<style>
+    #picker-width{
+        width:250px;
+        text-align:center;
+    }
+</style>
+@if (isLoading)
+{
+    <LoaderRows />
+}
+else
+{
+    <div class="d-flex flex-row align-center gap-5 justify-space-between pb-2">
+        <MudSelect T="Branch" Margin="Margin.Dense" Dense="true" Class="d-flex align-start justify-center" AnchorOrigin="Origin.BottomCenter" Strict="true" Value="Branch" ValueChanged="BranchChanged" Label="Branch" Variant="Variant.Outlined">
+            @foreach (Branch item in Branches)
+            {
+                <MudSelectItem Value="@item">@item.BranchName</MudSelectItem>
+            }
+        </MudSelect>
+        <MudFab Label="Stock Out" Class="d-flex align-center justify-end" DisableElevation="true" StartIcon="@Icons.Material.Filled.Add" OnClick="@(() => nav.NavigateTo("stockout"))" Color="Color.Primary" Size="Size.Small" />
+    </div>
+    <MudDataGrid T="Item" Items="@AppState.Products.OrderByDescending(x => x.ModifiedTicks)" Virtualize="true" QuickFilter="_quickFilter"
+        Dense="true" Hover="true" Striped="true" Outlined="true">
+        <ToolBarContent>            
+            <MudTooltip Text="Report" Duration="1000" Placement="Placement.Top">
+                <MudIconButton Icon="@Icons.Material.Filled.Print" OnClick="@(() => Dialog.Show<ItemReportDialog>())" />
+            </MudTooltip>
+            <MudSpacer />
+            <MudTextField @bind-Value="AppState.searchString" Immediate="true" Placeholder="Search" Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+        </ToolBarContent>
+        <Columns>
+            <PropertyColumn Property="x => x.Branch!.BranchName" Title="Branch" />
+            <PropertyColumn Property="x => x.ItemName" Title="Item"/>
+            <PropertyColumn Property="x => x.Quantity!.Value" Title="Qty" />
+            <PropertyColumn Property="x => x.BuyPrice!.Value" Title="Buy Price"  Format="N2"/>
+            <PropertyColumn Property="x => x.SellPrice!.Value" Title="Sell Price" Format="N2"/>
+            <TemplateColumn Title="Actions" Context="ItemContext">
+                <CellTemplate>
+                    <MudTooltip Text="Edit" Placement="Placement.Top">
+                        <MudFab StartIcon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                OnClick="@(() => nav.NavigateTo($"editproduct/{ItemContext.Item.Id}"))" IconSize="Size.Small" Color="Color.Info" />
+                    </MudTooltip>
+                    <MudTooltip Text="Restock" Placement="Placement.Top">
+                        <MudFab StartIcon="@Icons.Material.Filled.Refresh" Size="Size.Small"
+                                OnClick="@(() => AddStock(ItemContext.Item))" IconSize="Size.Small" Color="Color.Tertiary" />
+                    </MudTooltip>
+                    <MudTooltip Text="Delete" Placement="Placement.Top">
+                        <MudFab StartIcon="@Icons.Material.Filled.Delete" Size="Size.Small" Disabled="@isDeleting"
+                                OnClick="@(() => Delete(ItemContext.Item))" IconSize="Size.Small" Color="Color.Error" />
+                    </MudTooltip>
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+        <PagerContent>
+            <MudDataGridPager T="Item" />
+        </PagerContent>
+    </MudDataGrid>
+    <div class="fabs-container">
+        <MudFab Class="fab" OnClick="@(() => nav.NavigateTo("newproduct"))" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" />
+    </div>
+}
+
+@code {
+    private string searchString = "";
+    private Item product = new();
+    private bool isVisible { get; set; } = false;
+    private bool isBusy = false, isLoading, isDeleting = false;
+    private string progressVisibility => isBusy ? "visibility: visible;" : "visibility: collapse;";
+    private string operationType => isEdit ? "Edit" : "Add";
+    public bool isEdit { get; set; }
+
+    public Branch[] Branches = [];
+    private Branch? Branch { get; set; }
+
+    EsModuleFactory? moduleFactory;
+    protected override async Task OnInitializedAsync()
+    {        
+        isLoading = true;
+        LayoutService.CurrentMenu = "Manage Products";       
+        await Task.Delay(100);
+        await ReloadData();
+        AppState!.OnUpdate += ComponentUpdateOccured!;
+        isLoading = false;
+    }
+
+
+    async Task Delete(Item product)
+    {
+        isDeleting = true;
+        bool? result = await Dialog.ShowMessageBox("Confirmation",
+        $"Do you wish to Delete Product?", yesText: "Yes", cancelText: "No");
+        if (result is null)
+        {
+            isDeleting = false;
+            return;
+        }
+        else if (!result.Value)
+        {
+            isDeleting = false;
+            return;
+        }
+        var db = new MyDb(moduleFactory!);
+        try
+        {            
+            SnackBar.Add($"Product successfully deleted!", Severity.Success);
+        }
+        catch (System.Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            SnackBar.Add($"Error occured!", Severity.Error);
+        }
+        finally
+        {
+            await db.DisposeAsync();
+            await ReloadData();            
+            isDeleting = false;
+        }
+    }
+
+    void AddStock(Item product)
+    {
+        AppState!.Item = product;
+        Dialog.Show<ProductStock>("");
+    }
+
+    private async Task ReloadData()
+    {
+        moduleFactory = new EsModuleFactory(js);
+        var db = new MyDb(moduleFactory);
+        Branches = await db.Branches.OrderBy("BranchName").ToArray();
+        Branch = Branches.FirstOrDefault();
+        await SearchByBranch(Branch!.Id);        
+    }
+
+    async void BranchChanged(Branch branch)
+    {
+        Branch = branch;
+        await SearchByBranch(Branch.Id);
+        StateHasChanged();
+    }
+    async Task SearchByBranch(Guid id)
+    {
+        var db = new MyDb(moduleFactory!);
+        AppState.Products = await db.Items.Where("BranchID").IsEqual(Branch!.Id).ToList();       
+        await db.DisposeAsync();
+    }
+
+    private Func<Item, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(AppState.searchString!))
+            return true;
+
+        if (x!.ItemName!.Contains(AppState.searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (x!.Category!.CategoryName!.Contains(AppState.searchString!, StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (x!.Branch!.BranchAddress!.Contains(AppState.searchString!   , StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    };
+    
+
+    private async void ComponentUpdateOccured(object sender, EventArgs e)
+    {
+        await InvokeAsync(ReloadData);
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        AppState!.OnUpdate -= ComponentUpdateOccured!;
+    }
+
+}

@@ -1,0 +1,41 @@
+@if (IsLoading)
+{
+    <MudGrid>
+        <MudItem xs="12">
+            <div class="d-flex justify-center">
+                <MudSkeleton Animation="Animation.Pulse" SkeletonType="SkeletonType.Rectangle" Width="450px" Height="350px" />
+            </div>
+        </MudItem>
+    </MudGrid>
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12">
+            <div class="d-flex justify-center">
+                <MudText Typo="Typo.h5" Class="pa-1" Style="font-weight: 200;">Top Customer</MudText>
+            </div>
+        </MudItem>
+        <MudItem xs="12">
+            <div class="d-flex justify-center">
+                <MudCard Outlined="true" Style="width:300px;height:350px;">
+                    <MudCardHeader>
+                        <MudText Align="Align.Center" Typo="Typo.h6">Tailoring Sales</MudText>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudStack AlignItems="AlignItems.Center">
+                            <MudIcon Icon="@Icons.Material.Filled.AccountCircle" Size="Size.Large" Style="font-size: 10rem;" Class="rounded" />
+                            <MudText Class="pa-1" Typo="Typo.h6">Name: @customer.Keys.First()</MudText>
+                            <MudText Class="pa-0" Typo="Typo.h6">Total Sales: @customer.Values.First()</MudText>
+                        </MudStack>
+                    </MudCardContent>
+                </MudCard>
+            </div>
+        </MudItem>
+    </MudGrid>
+
+}
+@code {
+    [Parameter, EditorRequired] public bool IsLoading { get; set; } = false;
+    [Parameter, EditorRequired] public Dictionary<string, int> customer { get; set; } = new();
+}

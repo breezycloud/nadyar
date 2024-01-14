@@ -1,0 +1,145 @@
+@layout AppLayout
+@page "/categories"
+@using BlazorDexie.JsModule
+@inject LayoutService LayoutService
+@inject IJSRuntime js
+@implements IDisposable
+
+@if (categories is null)
+{
+    <LoaderRows/>
+}
+else
+{
+    <MudDataGrid T="Category" Items="@categories.OrderByDescending(x=> x.ModifiedDate)" Outlined="true" Elevation="2" Dense="true"
+                 QuickFilter="_quickFilter">
+        <ToolBarContent>            
+            <MudSpacer />
+            <MudTextField @bind-Value="AppState.searchString" Placeholder="Search" Immediate="true"
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0">
+            </MudTextField>
+        </ToolBarContent>
+        <Columns>
+            <PropertyColumn Property="x => x.CategoryName" Title="Item" Filterable="true"/>
+            <PropertyColumn Property="x => x.Description" Filterable="true" />
+            <PropertyColumn  Property="x => x.ModifiedDate" Title="Date Modified"/>
+            <TemplateColumn T="Category" Title="Actions" Context="context">
+                <CellTemplate>
+                    <MudFab Size="Size.Small" Color="Color.Info" StartIcon="@Icons.Material.Filled.Edit" OnClick="@(() => Edit(context.Item))" />
+                    <MudFab Disabled="@isDeleting" Color="Color.Error" Size="Size.Small" StartIcon="@Icons.Material.Filled.Delete" OnClick="@(() => Delete(context.Item))"/>
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+        <PagerContent>
+            <MudDataGridPager T="Category" />
+        </PagerContent>
+    </MudDataGrid>
+    <div class="fabs-container">
+        <MudFab Class="fab" OnClick="@(() => { Dialog.Show<CategoryEntry>(""); } )" 
+            Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" />        
+    </div>
+}
+
+@code{
+    private string searchString = string.Empty;
+    private bool isDeleting = false;
+    private Category[]? categories = null;
+    DialogOptions options = new DialogOptions { CloseButton = true };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        LayoutService.CurrentMenu = "Categories";        
+        try
+        {
+            await Task.Delay(100);
+            await LoadData();
+            AppState!.OnUpdate += ComponentUpdateOccured!;
+        }
+        finally
+        {
+            AppState.IsBusy = false;
+        }        
+    }
+    public async Task LoadData()
+    {
+        var moduleFactory = new EsModuleFactory(js);
+        var db = new MyDb(moduleFactory);
+        categories = await db.Categories.OrderBy(nameof(Category.CategoryName)).ToArray();
+        await db.DisposeAsync();        
+    }
+
+    void Edit(Category category)
+    {        
+        var parameters = new DialogParameters
+        {  
+            ["Category"] = category, 
+            ["isAdd"] = false            
+        };
+        Dialog.Show<CategoryEntry>("", parameters: parameters, options);
+    }
+
+    private async Task Delete(Category category)
+    {
+        isDeleting = true;
+        var prompt = await Dialog.ShowMessageBox("Confirmation", "Do you wish to delete", yesText:"Yes", cancelText:"No");
+        if (prompt is null)
+        {
+            isDeleting = false;
+            return;
+        }
+        var moduleFactory = new EsModuleFactory(js);
+        var db = new MyDb(moduleFactory);
+
+        category.IsDeleted = true;
+        category.ModifiedDate = DateTime.Now;
+        try
+        {
+            await db.Categories.Put(category);
+            SnackBar.Add("Category Successfully Deleted", Severity.Success);
+            await OnParametersSetAsync();
+        }
+        catch
+        {
+            SnackBar.Add("An Error Occured", Severity.Error);
+        }
+        finally
+        {
+            await db.DisposeAsync();
+            isDeleting = false;
+        }        
+    }
+
+    private bool FilterFunc(Category category)
+    {
+        if (string.IsNullOrWhiteSpace(AppState.searchString))        
+            return true;
+        if (category!.CategoryName!.Contains(AppState.searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (category!.Description!.Contains(AppState.searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    }
+
+    private async void ComponentUpdateOccured(object sender, EventArgs e)
+    {
+        await InvokeAsync(LoadData);
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        AppState!.OnUpdate -= ComponentUpdateOccured!;
+    }
+
+    private Func<Category, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(AppState.searchString!))
+            return true;
+
+        if (x.CategoryName!.Contains(AppState!.searchString!, StringComparison.OrdinalIgnoreCase))
+            return true;        
+
+        return false;
+    };
+}

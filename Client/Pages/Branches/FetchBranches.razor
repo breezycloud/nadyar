@@ -1,0 +1,143 @@
+@layout AppLayout
+@page "/Branches"
+@using BlazorDexie.JsModule
+@inject LayoutService LayoutService
+@inject IJSRuntime js
+@implements IDisposable
+
+@if (Branches is null)
+{
+    <LoaderRows/>
+}
+else
+{
+    <MudDataGrid T="Branch" Items="@Branches.OrderByDescending(x=> x.ModifiedDate)" Outlined="true" Elevation="2" Dense="true"
+                 QuickFilter="_quickFilter">
+        <ToolBarContent>            
+            <MudSpacer />
+            <MudTextField @bind-Value="AppState.searchString" Placeholder="Search" Immediate="true"
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0">
+            </MudTextField>
+        </ToolBarContent>
+        <Columns>
+            <PropertyColumn Property="x => x.BranchName" Title="Branch Name" />
+            <PropertyColumn Property="x => x.BranchAddress" Title="Branch Address"/>
+            <PropertyColumn  Property="x => x.ModifiedDate" Title="Date Modified"/>
+            <TemplateColumn T="Branch" Title="Actions" Context="context">
+                <CellTemplate>
+                    <MudFab Size="Size.Small" Color="Color.Info" StartIcon="@Icons.Material.Filled.Edit" OnClick="@(() => Edit(context.Item))" />
+                    <MudFab Disabled="@isDeleting" Color="Color.Error" Size="Size.Small" StartIcon="@Icons.Material.Filled.Delete" OnClick="@(() => Delete(context.Item))"/>
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+        <PagerContent>
+            <MudDataGridPager T="Branch" />
+        </PagerContent>
+    </MudDataGrid>
+    <div class="fabs-container">
+        <MudFab Class="fab" OnClick="@(() => { Dialog.Show<BranchEntry>(""); } )" 
+            Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" />        
+    </div>
+}
+
+@code{
+    private string searchString = string.Empty;
+    private bool isDeleting = false;
+    private Branch[]? Branches = null;
+    DialogOptions options = new DialogOptions { CloseButton = true };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        LayoutService.CurrentMenu = "Branches";
+        try
+        {
+            await Task.Delay(100);
+            await LoadData();
+            AppState!.OnUpdate += ComponentUpdateOccured!;
+        }
+        finally
+        {
+            AppState.IsBusy = false;
+        }        
+    }
+    public async Task LoadData()
+    {
+        var moduleFactory = new EsModuleFactory(js);
+        var db = new MyDb(moduleFactory);
+        Branches = await db.Branches.OrderBy(nameof(Branch.BranchName)).ToArray();
+        await db.DisposeAsync();        
+    }
+
+    void Edit(Branch branch)
+    {        
+        var parameters = new DialogParameters
+        {  
+            ["Branch"] = branch, 
+            ["isAdd"] = false            
+        };
+        Dialog.Show<BranchEntry>("", parameters: parameters, options);
+    }
+
+    private async Task Delete(Branch branch)
+    {
+        isDeleting = true;
+        var prompt = await Dialog.ShowMessageBox("Confirmation", "Do you wish to delete", yesText:"Yes", cancelText:"No");
+        if (prompt is null)
+        {
+            isDeleting = false;
+            return;
+        }
+        var moduleFactory = new EsModuleFactory(js);
+        var db = new MyDb(moduleFactory);
+
+        try
+        {
+            await db.Branches.Delete(branch.Id);
+            SnackBar.Add("Branch Successfully Deleted", Severity.Success);
+            AppState.UpdateLayout();
+        }
+        catch
+        {
+            SnackBar.Add("An Error Occured", Severity.Error);
+        }
+        finally
+        {
+            await db.DisposeAsync();
+            isDeleting = false;
+        }        
+    }
+
+    private bool FilterFunc(Branch branch)
+    {
+        if (string.IsNullOrWhiteSpace(AppState.searchString))        
+            return true;
+        if (branch!.BranchName!.Contains(AppState.searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (branch!.BranchAddress!.Contains(AppState.searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    }
+
+    private async void ComponentUpdateOccured(object sender, EventArgs e)
+    {
+        await InvokeAsync(LoadData);
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        AppState!.OnUpdate -= ComponentUpdateOccured!;
+    }
+
+    private Func<Branch, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(AppState.searchString!))
+            return true;
+
+        if (x.BranchName!.Contains(AppState!.searchString!, StringComparison.OrdinalIgnoreCase))
+            return true;        
+
+        return false;
+    };
+}

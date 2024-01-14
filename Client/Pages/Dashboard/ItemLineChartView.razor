@@ -1,0 +1,86 @@
+@if (IsLoading)
+{
+    <MudGrid>
+        <MudItem xs="12">
+            <div class="d-flex justify-center">
+                <MudSkeleton Animation="Animation.Wave" SkeletonType="SkeletonType.Rectangle" Width="450px" Height="350px" />
+            </div>
+        </MudItem>
+    </MudGrid>
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12">
+            <div class="d-flex justify-center">
+                <MudText Typo="Typo.h5" Class="pa-1" Style="font-weight: 200;">Sales</MudText>
+            </div>
+        </MudItem>
+        <MudItem xs="12">
+            <div>
+                <MudChart ChartType="ChartType.Line" ChartSeries="@Series" XAxisLabels="@XAxisLabels" Width="100%" Height="350px"></MudChart>
+            </div>
+        </MudItem>
+    </MudGrid>
+}
+@code {
+    [Parameter, EditorRequired] public bool IsLoading { get; set; } = false;
+    [Parameter, EditorRequired] public ItemSalesLine[] Data { get; set; } = Array.Empty<ItemSalesLine>();
+    protected override async Task OnParametersSetAsync()
+    {
+        await AppendChartData(Data);
+    }
+
+
+    public List<ChartSeries> Series = new List<ChartSeries>();
+
+    public string[] XAxisLabels = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+
+
+    private async ValueTask AppendChartData(ItemSalesLine[] yearMonths)
+    {
+        Series = new List<ChartSeries>();
+        var distinctYears = yearMonths.Select(x => x.Year).Distinct().ToList();
+        for (int i = 0; i < distinctYears.Count; i++)
+        {
+            var yearValue = distinctYears[i];
+            var yearSales = yearMonths.Where(x => x.Year == yearValue).ToList();
+            Series.Add(new ChartSeries()
+                {
+                    Name = yearValue.ToString(),
+                    Data = new double[12]
+                });
+            int iMonth = 1;
+            for (int y = 0; y < 12; y++)
+            {
+                var value = yearSales.Where(v => v.Year == yearValue && v.Month == iMonth).FirstOrDefault();
+                if (value is null)
+                {
+                    Series[i].Data[y] = 0;
+                    iMonth++;
+                    continue;
+                }
+                else
+                {
+                    Series[i].Data[y] = double.Parse(value!.Sales!.ToString()!);
+                    iMonth++;
+                }
+            }
+
+        }
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private class YearMonth
+    {
+        public int Year { get; set; }
+        public int Month { get; set; }
+        public int? Sales { get; set; }
+    }
+
+    private class YearlySales
+    {
+        public int Year { get; set; }
+        public double[] TotalSales { get; set; } = default!;
+    }
+}
