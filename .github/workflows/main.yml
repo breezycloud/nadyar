@@ -1,6 +1,6 @@
 name: Deploy
 env:
-  PUBLISH_DIR: publish/wwwroot
+  PUBLISH_DIR: bin/Release/net8.0/publish/wwwroot
 
 # Controls when the action will run
 on:
