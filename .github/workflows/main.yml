@@ -1,6 +1,6 @@
 name: Deploy
 env:
-  PUBLISH_DIR: publish
+  PUBLISH_DIR: publish/wwwroot
 
 # Controls when the action will run
 on:
