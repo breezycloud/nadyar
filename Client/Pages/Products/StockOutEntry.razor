@@ -176,11 +176,9 @@ else
         {
             SnackBar.Add("Enter valid quantity", Severity.Warning);
             return;
-        }
-        CultureInfo provider = CultureInfo.InvariantCulture;
-        var d = DateTime.ParseExact(DateText, "dd/MM/yyyy", provider);
-        Console.WriteLine(d);
-        var date = DateOnly.FromDateTime(d);
+        }        
+        
+        var date = AppState.ParseStringDate(DateText);
         Item!.Quantity -= Quantity;
 
         if (AppState.StockOut.Any(x => x.Id == Item.Id))

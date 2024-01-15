@@ -11,10 +11,12 @@ namespace Client.Reports;
 
 public class ItemsReport
 {
-    public ItemsReport(List<ItemsReportModel>? model, string? reportHeader)
+    private string Branch { get; set; }
+    public ItemsReport(List<ItemsReportModel>? model, string? reportHeader, string branch)
     {
         Model = model;
         ReportHeader = reportHeader;
+        Branch = branch;
     }
     public string? ReportHeader { get; set; }
     private List<ItemsReportModel>? Model { get; set; }
@@ -28,7 +30,7 @@ public class ItemsReport
                 page.Size(PageSizes.A4.Portrait());
                 page.MarginTop(0, Unit.Inch);
 
-                page.Header().Element(ComposeHeader);
+                page.Header().ShowOnce().Element(ComposeHeader);
                 page.Content().Element(ComposeContent);
 
             });
@@ -41,9 +43,10 @@ public class ItemsReport
         {
             column.Spacing(5);
             //column.Item().AlignCenter().Width(30, Unit.Millimetre).Height(30, Unit.Millimetre).Image(Logo, ImageScaling.FitArea);
-            column.Item().AlignLeft().Text("Nadyar").Bold().FontSize(20);
-            column.Item().AlignLeft().Text("Stock Report").FontSize(15);
-            column.Item().AlignLeft().Text(ReportHeader).FontSize(15);
+            column.Item().AlignLeft().Text("NADYAR STORE").Bold().FontSize(20);            
+            column.Item().AlignLeft().Text(Branch).Bold().FontSize(15);
+            column.Item().AlignLeft().Text("Stock Report").FontSize(13);
+            column.Item().AlignLeft().Text(ReportHeader).FontSize(10);
         });
     }
     void ComposeContent(IContainer container)

@@ -12,9 +12,11 @@ namespace Client.Reports;
 
 public class SalesReport
 {
-    public SalesReport(List<SalesReportModel>? model)
+    private string Branch { get; set; }
+    public SalesReport(List<SalesReportModel>? model, string branch)
     {
         Model = model;
+        Branch = branch;
     }
     private List<SalesReportModel>? Model { get; set; }
 
@@ -27,7 +29,7 @@ public class SalesReport
                 page.Size(PageSizes.A4.Portrait());
                 page.MarginTop(0, Unit.Inch);
 
-                page.Header().Element(ComposeHeader);
+                page.Header().ShowOnce().Element(ComposeHeader);
                 page.Content().Element(ComposeContent);
 
             });
@@ -38,11 +40,12 @@ public class SalesReport
     {
         container.AlignLeft().Column(column =>
         {
-            column.Spacing(5);
+            column.Spacing(4);
             //column.Item().AlignCenter().Width(30, Unit.Millimetre).Height(30, Unit.Millimetre).Image(Logo, ImageScaling.FitArea);
-            column.Item().AlignLeft().Text("Nadyar").Bold().FontSize(20);
-            column.Item().AlignLeft().Text("Sales Report").FontSize(15);
-            column.Item().AlignLeft().Text($"Date {Model!.Select(x => x.Date).First()}").FontSize(10);
+            column.Item().AlignLeft().Text("NADYAR STORE").Bold().FontSize(20);            
+            column.Item().AlignLeft().Text(Branch).Bold().FontSize(15);
+            column.Item().AlignLeft().Text("Sales Report").FontSize(13);
+            column.Item().AlignLeft().Text($"{Model!.Select(x => x.Date).First()}").FontSize(10);
         });
     }
     void ComposeContent(IContainer container)
@@ -96,16 +99,16 @@ public class SalesReport
                 table.Cell().Border(1f).BorderColor(Colors.Grey.Medium).AlignRight().Text($"{item.SellPrice:N2}").FontSize(10);
                 table.Cell().Border(1f).BorderColor(Colors.Grey.Medium).AlignCenter().Text($"{item.SoldQty}").FontSize(10);
                 table.Cell().Border(1f).BorderColor(Colors.Grey.Medium).AlignRight().Text($"{item.TotalSellPrice:N2}").FontSize(10);
-                table.Cell().Border(1f).BorderColor(Colors.Grey.Medium).AlignRight().Text($"{item.Profit:N2}").FontSize(10);
+                table.Cell().Border(1f).BorderColor(Colors.Grey.Medium).AlignRight().Text($"{item.Profit * item.SoldQty:N2}").FontSize(10);
             }
             table.Cell();
             table.Cell();
             table.Cell();
-            table.Cell();
-            table.Cell();
-            table.Cell();
+            table.Cell().Border(1f).BorderColor(Colors.Grey.Medium).AlignRight().Text($"{Model.Sum(x => x.BuyPrice):N2}");
+            table.Cell().Border(1f).BorderColor(Colors.Grey.Medium).AlignRight().Text($"{Model.Sum(x => x.SellPrice):N2}");
+            table.Cell().Border(1f).BorderColor(Colors.Grey.Medium).AlignCenter().Text($"{Model.Sum(x => x.SoldQty)}");
             table.Cell().Border(1f).BorderColor(Colors.Grey.Medium).AlignRight().Text($"{Model.Sum(x => x.TotalSellPrice):N2}");
-            table.Cell().Border(1f).BorderColor(Colors.Grey.Medium).AlignRight().Text($"{Model.Sum(x => x.Profit):N2}");
+            table.Cell().Border(1f).BorderColor(Colors.Grey.Medium).AlignRight().Text($"{Model.Sum(x => x.Profit * x.SoldQty):N2}");
 
             //table.Footer(footer =>
             //{

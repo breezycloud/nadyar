@@ -2,6 +2,7 @@
 @using BlazorDexie.JsModule
 @inject LayoutService LayoutService
 @inject IJSRuntime js
+
 @if (AppState.IsBusy)
 {
     <Loader/>
@@ -13,62 +14,126 @@ else
             <MudText Typo="Typo.h6">Items Report</MudText>
         </TitleContent>
         <DialogContent>
-            <MudGrid Class="pa-3" Spacing="2">
+            <MudGrid Spacing="2">
                 <MudItem xs="12" Class="d-flex align-center justify-center">
-                    <MudRadioGroup @bind-SelectedOption="SelectedOption">
-                        <MudRadio Color="Color.Tertiary" Option="@("All")">Category</MudRadio>
-                        <MudRadio Color="Color.Secondary" Option="@("Selected")">Product</MudRadio>
+                    <MudRadioGroup T="string" SelectedOption="ReportType" SelectedOptionChanged="ReportTypeChanged">
+                        <MudRadio Size="Size.Small" Color="Color.Primary" Option="@("Sales")">Sales</MudRadio>
+                        <MudRadio Size="Size.Small" Color="Color.Dark" Option="@("Stock")">Stock</MudRadio>
                     </MudRadioGroup>
                 </MudItem>
                 <MudItem xs="12">
-                    <MudSelect Dense="true" AnchorOrigin="Origin.BottomCenter" Strict="true" T="Guid"
-                           Label="Category" Value="Category.Id" Variant="Variant.Outlined" ValueChanged="@CategoryValueChanged">
-                        @foreach (Category category in AppState.Categories)
+                    <MudSelect Dense="true" AnchorOrigin="Origin.BottomCenter" Strict="true" T="Branch" Margin="Margin.Dense"
+                        Label="Branch" Value="Branch" Variant="Variant.Outlined" ValueChanged="@BranchChanged">
+                        @foreach (Branch branch in Branches)
                         {
-                            <MudSelectItem Value="@category.Id">@category.CategoryName</MudSelectItem>
+                            <MudSelectItem Value="@branch">@branch.BranchName</MudSelectItem>
                         }
                     </MudSelect>
                 </MudItem>
-                <MudItem xs="12">
-                    @if (SelectedOption == "Selected")
-                    {
-                        <MudSelect Dense="true" AnchorOrigin="Origin.BottomCenter" Strict="true" T="Item"
-                           Label="Item" Variant="Variant.Outlined" Value="@Item" ValueChanged="@ItemValueChanged">
-                            @foreach (Item item in items)
+                @if (ReportType == "Stock")                
+                {
+                    <MudItem xs="12" Class="d-flex align-center justify-center">
+                        <MudRadioGroup @bind-SelectedOption="SelectedOption">
+                            <MudRadio Size="Size.Small" Color="Color.Tertiary" Option="@("All")">Category</MudRadio>
+                            <MudRadio Size="Size.Small" Color="Color.Secondary" Option="@("Selected")">Product</MudRadio>
+                        </MudRadioGroup>
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudSelect Dense="true" AnchorOrigin="Origin.BottomCenter" Strict="true" T="Guid" Margin="Margin.Dense"
+                            Label="Category" Value="Category.Id" Variant="Variant.Outlined" ValueChanged="@CategoryValueChanged">
+                            @foreach (Category category in AppState.Categories)
                             {
-                                <MudSelectItem Value="@item">@item.ItemName</MudSelectItem>
+                                <MudSelectItem Value="@category.Id">@category.CategoryName</MudSelectItem>
                             }
                         </MudSelect>
-                    }
-                </MudItem>
+                    </MudItem>
+                    <MudItem xs="12">
+                        @if (SelectedOption == "Selected")
+                        {
+                            <MudSelect Dense="true" AnchorOrigin="Origin.BottomCenter" Strict="true" T="Item" Margin="Margin.Dense"
+                            Label="Item" Variant="Variant.Outlined" Value="@Item" ValueChanged="@ItemValueChanged">
+                                @foreach (Item item in items)
+                                {
+                                    <MudSelectItem Value="@item">@item.ItemName</MudSelectItem>
+                                }
+                            </MudSelect>
+                        }
+                    </MudItem>
+                }
+                else
+                {
+                    <MudItem xs="12" Class="d-flex align-center justify-center">
+                        <MudRadioGroup T="string" SelectedOption="FilterMode" SelectedOptionChanged="FilterChanged">
+                            <MudRadio Size="Size.Small" Option="@("Date")">Date</MudRadio>
+                            <MudRadio Size="Size.Small" Option="@("Month")">Month</MudRadio>
+                            <MudRadio Size="Size.Small" Option="@("Year")">Year</MudRadio>
+                        </MudRadioGroup>
+                    </MudItem>
+                    <MudItem xs="12" Class="d-flex flex-column align-center justify-center">
+                        <MudTextField id="figure-center" @bind-Value="StartDate" Placeholder="@Format" Label="Start Date" Format="@Format" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                    </MudItem>
+                }
             </MudGrid>
         </DialogContent>
         <DialogActions>
             <MudButton Disabled="AppState.IsProcessing" OnClick="GetReportItems" ButtonType="ButtonType.Submit" Variant="Variant.Filled"
-                   Color="Color.Primary">@(AppState.IsProcessing ? "Processing" : "Download")</MudButton>
+                   Size="Size.Small" Color="Color.Primary">@(AppState.IsProcessing ? "Processing" : "Download")</MudButton>
         </DialogActions>
     </MudDialog>
 }
 
 @code {
+    private string? ReportType { get; set; } = "Sales";
     private string? SelectedOption { get; set; } = "All";
+    private string? FilterMode { get; set; }
     private Category Category { get; set; } = new();
+    private string? StartDate { get; set; }
+    private string? EndDate { get; set; }
+    private string? Format;
+    private Branch[] Branches = [];
+    private Branch Branch = new();
     protected override async Task OnInitializedAsync()
     {
         AppState!.IsBusy = true;
         await Task.Delay(300);
         moduleFactory = new EsModuleFactory(js);
-        await LoadItems();
+        await LoadBranches();    
         AppState!.IsBusy = false;
     }
     EsModuleFactory? moduleFactory;
+    async Task LoadBranches()
+    {
+        var db = new MyDb(moduleFactory!);
+        Branches = await db.Branches.ToArray();
+        Branch = Branches.FirstOrDefault()!;            
+    }
+    async Task ReportTypeChanged(string type)
+    {
+        if (type == "Stock")
+            await LoadItems();
+        
+        ReportType = type;
+        StateHasChanged();
+    }
+    async Task BranchChanged(Branch branch)
+    {
+        Branch = branch;
+        if (ReportType == "Stock")
+        {
+            AppState.Products = new();
+            await LoadItems();
+        }
+        StateHasChanged();
+    }
     async Task LoadItems()
     {
         var db = new MyDb(moduleFactory!);
         try
         {
-            AppState.Categories = await db.Categories.OrderBy(nameof(Category.CategoryName)).ToArray();
-            AppState.Products = await db.Items.OrderBy(nameof(Item.ItemName)).ToList();
+            if (AppState.Categories.Length == 0)
+                AppState.Categories = await db.Categories.OrderBy(nameof(Category.CategoryName)).ToArray();
+            AppState.Products = await db.Items.Where("BranchID").IsEqual(Branch.Id).ToList();
+            AppState.Products = AppState.Products.OrderByDescending(x => x.ModifiedTicks).ToList();
         }
         catch (Exception ex)
         {
@@ -95,27 +160,62 @@ else
     async Task GetReportItems()
     {
         AppState.IsProcessing = true;
-        if (SelectedOption == string.Empty)
+        if (ReportType == "Stock")
         {
-            SnackBar.Add("Select Report Option", Severity.Warning);
-            AppState.IsProcessing = false;
-            return;
-        }
-        else if (SelectedOption == "All" && Category.Id == Guid.Empty)
+            if (SelectedOption == string.Empty)
+            {
+                SnackBar.Add("Select Report Option", Severity.Warning);
+                AppState.IsProcessing = false;
+                return;
+            }
+            else if (SelectedOption == "All" && Category.Id == Guid.Empty)
+            {
+                SnackBar.Add("Select Category", Severity.Warning);
+                AppState.IsProcessing = false;
+                return;
+            }
+            else if (SelectedOption == "Selected" && Item is null)
+            {
+                SnackBar.Add("Select Item", Severity.Warning);
+                AppState.IsProcessing = false;
+                return;
+            }
+            await Stock();
+        }    
+        else
         {
-            SnackBar.Add("Select Category", Severity.Warning);
-            AppState.IsProcessing = false;
-            return;
-        }
-        else if (SelectedOption == "Selected" && Item is null)
+            if (string.IsNullOrEmpty(StartDate))
+            {
+                SnackBar.Add("Select Item", Severity.Warning);
+                AppState.IsProcessing = false;
+                return;                
+            }
+
+            await Sales();
+        } 
+        
+        
+        AppState.IsProcessing = false;
+    }
+
+    void FilterChanged(string? filter)
+    {
+        Format = filter switch
         {
-            SnackBar.Add("Select Item", Severity.Warning);
-            AppState.IsProcessing = false;
-            return;
-        }
+            "Month" => "MM/yyyy",
+            "Year" => "yyyy",
+            _ => "dd/MM/yyyy"
+        };
+        StartDate = "";
+        FilterMode = filter;
+        StateHasChanged();        
+    }
+
+    async Task Stock()
+    {
         string? reportHeader = string.Empty;
         var db = new MyDb(moduleFactory!);
-        Item[] products = await db.Items.ToArray();
+        Item[] products = items;
         try
         {
             List<ItemsReportModel>? data = null;
@@ -154,7 +254,7 @@ else
                 AppState.IsProcessing = false;
                 return;
             }
-            var report = new ItemsReport(data, reportHeader);
+            var report = new ItemsReport(data, reportHeader, Branch.BranchName!);
             var bytes = report.Create();
             await js.InvokeVoidAsync("exportFile", $"Items Report {DateTime.Now.Ticks}.pdf", Convert.ToBase64String(bytes));
         }
@@ -166,6 +266,92 @@ else
         {
             await db.DisposeAsync();            
         }
-        AppState.IsProcessing = false;
+    }
+
+    async Task Sales()
+    {
+        string? reportHeader = string.Empty;
+        var db = new MyDb(moduleFactory!);
+        Item[] items = await db.Items.Where("BranchID").IsEqual(Branch!.Id).ToArray();
+        DateOnly? date = null!;
+        try
+        {
+            string text = string.Empty;
+            if (FilterMode == "Month")
+            {
+                text = $"{DateTime.Now.Day}/{StartDate}";
+                date = AppState.ParseStringDate(text);
+            }
+            else if (FilterMode == "Year")
+            {
+                text = $"{DateTime.Now.Day}/01/{StartDate}";
+                date = AppState.ParseStringDate(text);
+            }            
+            else
+                date = AppState.ParseStringDate(StartDate);
+            List<SalesReportModel>? data = null;
+            if (FilterMode == "Date")
+            {                
+                data = items.Where(x => x.StocksOut!.All(d => d.Date == date && d.Quantity > 0))
+                                 .Select(x => new SalesReportModel
+                                 {
+                                    Date = $"{date.Value.ToString("dd/MM/yyyy")}",
+                                    ItemName = x.ItemName,
+                                    Category = x.Category!.CategoryName,
+                                    BuyPrice = x.BuyPrice!.Value,
+                                    SellPrice = x.SellPrice!.Value,
+                                    SellPriceArray = x.StocksOut!.Select(d => x.SellPrice.Value * d.Quantity!.Value).ToArray(),
+                                    SoldQty = x.StocksOut!.Sum(x => x.Quantity!.Value),                                     
+                                 }).ToList();
+            }
+            else if (FilterMode == "Month")
+            {
+                data = items.Where(x => x.StocksOut!.All(d => d.Date.Month == date.Value.Month && d.Date.Year == date.Value.Year && d.Quantity > 0))
+                                 .Select(x => new SalesReportModel
+                                 {
+                                    Date = $"{date.Value.ToString("MM/yyyy")}",
+                                    ItemName = x.ItemName,
+                                    Category = x.Category!.CategoryName,
+                                    BuyPrice = x.BuyPrice!.Value,
+                                    SellPrice = x.SellPrice!.Value,
+                                    SellPriceArray = x.StocksOut!.Select(d => x.SellPrice.Value * d.Quantity!.Value).ToArray(),
+                                    SoldQty = x.StocksOut!.Sum(x => x.Quantity!.Value),                                     
+                                 }).ToList();
+            }
+            else
+            {
+                data = items.Where(x => x.StocksOut!.All(d => d.Date.Year == date.Value.Year && d.Quantity > 0))
+                                 .Select(x => new SalesReportModel
+                                 {
+                                    Date = $"{date.Value.ToString("yyyy")}",
+                                    ItemName = x.ItemName,
+                                    Category = x.Category!.CategoryName,
+                                    BuyPrice = x.BuyPrice!.Value,
+                                    SellPrice = x.SellPrice!.Value,
+                                    SellPriceArray = x.StocksOut!.Select(d => x.SellPrice.Value * d.Quantity!.Value).ToArray(),
+                                    SoldQty = x.StocksOut!.Sum(x => x.Quantity!.Value),                                     
+                                 }).ToList();
+            }
+
+            if (data!.Count == 0)
+            {
+                SnackBar.Add("No data found", Severity.Warning);
+                AppState.IsProcessing = false;
+                return;
+            }
+            data = data.Where(x => x.SoldQty > 0).OrderByDescending(x => x.TotalSellPrice).ToList();
+            var report = new SalesReport(data, Branch.BranchName!);
+            var bytes = report.Create();
+            await js.InvokeVoidAsync("exportFile", $"Sales Report {DateTime.Now.Ticks}.pdf", Convert.ToBase64String(bytes));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+        finally
+        {
+            await db.DisposeAsync();
+            AppState.IsProcessing = false;
+        }        
     }
 }

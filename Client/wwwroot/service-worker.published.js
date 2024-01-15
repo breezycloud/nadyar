@@ -16,6 +16,24 @@ const base = "/";
 const baseUrl = new URL(base, self.origin);
 const manifestUrlList = self.assetsManifest.assets.map(asset => new URL(asset.url, baseUrl).href);
 
+
+const notifyNewVersion = () => {
+    const bc = new BroadcastChannel('update-channel');
+
+    bc.postMessage('new-version-found');
+
+    bc.onmessage = function (message) {
+        if (message && message.data == "skip-waiting") {
+            self.skipWaiting();
+            bc.postMessage('reload');
+        }
+        if (message && message.data == "restarted") {            
+            bc.postMessage('notify');
+        }
+
+    }
+}
+
 async function onInstall(event) {
     console.info('Service worker: Install');
 
@@ -25,6 +43,7 @@ async function onInstall(event) {
         .filter(asset => !offlineAssetsExclude.some(pattern => pattern.test(asset.url)))
         .map(asset => new Request(asset.url, { integrity: asset.hash, cache: 'no-cache' }));
     await caches.open(cacheName).then(cache => cache.addAll(assetsRequests));
+    notifyNewVersion();
 }
 
 async function onActivate(event) {

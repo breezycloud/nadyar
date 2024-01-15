@@ -29,9 +29,9 @@ else
     <MudDataGrid T="Item" Items="@AppState.Products.OrderByDescending(x => x.ModifiedTicks)" Virtualize="true" QuickFilter="_quickFilter"
         Dense="true" Hover="true" Striped="true" Outlined="true">
         <ToolBarContent>            
-            <MudTooltip Text="Report" Duration="1000" Placement="Placement.Top">
+            @* <MudTooltip Text="Report" Duration="1000" Placement="Placement.Top">
                 <MudIconButton Icon="@Icons.Material.Filled.Print" OnClick="@(() => Dialog.Show<ItemReportDialog>())" />
-            </MudTooltip>
+            </MudTooltip> *@
             <MudSpacer />
             <MudTextField @bind-Value="AppState.searchString" Immediate="true" Placeholder="Search" Adornment="Adornment.Start"
                       AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
@@ -68,8 +68,7 @@ else
     </div>
 }
 
-@code {
-    private string searchString = "";
+@code {    
     private Item product = new();
     private bool isVisible { get; set; } = false;
     private bool isBusy = false, isLoading, isDeleting = false;

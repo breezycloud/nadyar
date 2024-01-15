@@ -25,12 +25,6 @@ else
                 </MudSelect>
             </MudItem>
             <MudItem xs="12" sm="6">
-                <MudTextField @bind-Value="product!.ItemName" Label="Product Name" Variant="Variant.Outlined" For="(() => product!.ItemName)"></MudTextField>
-            </MudItem>
-            <MudItem xs="12">
-                <MudTextField Lines="2" @bind-Value="product!.Description" Label="Description" Variant="Variant.Outlined"></MudTextField>
-            </MudItem>
-            <MudItem xs="12" sm="6">
                 <MudSelect T="Guid" Dense="true" AnchorOrigin="Origin.BottomCenter" Strict="true" Value="CategoryID" ValueChanged="CategoryChanged" Label="Category" Variant="Variant.Outlined">
                     @foreach (Category item in categories)
                     {
@@ -38,6 +32,12 @@ else
                     }
                 </MudSelect>
             </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="product!.ItemName" Label="Product Name" Variant="Variant.Outlined" For="(() => product!.ItemName)"></MudTextField>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="product!.Description" Label="Description" Variant="Variant.Outlined"></MudTextField>
+            </MudItem>            
             <MudItem xs="12" sm="6">
                 <MudTextField id="figure" T="decimal?" @bind-Value="product!.BuyPrice" For="(() => product!.BuyPrice)" Format="N2" Label="Buy Price" Variant="Variant.Outlined"></MudTextField>
             </MudItem>
@@ -200,11 +200,21 @@ else
         finally
         {            
             isProcessing = false;
-            if (!isEdit)
-                product = new();
-            else
+            if (isEdit)
                 nav.NavigateTo("products");
+            else
+                Clear();
         }        
+    }
+
+    void Clear()
+    {
+        product!.ItemName = "";
+        product!.Description = "";
+        product!.BuyPrice = null;
+        product!.SellPrice = null;
+        product!.Quantity = null;
+
     }
 
     void AddStock(Item product)

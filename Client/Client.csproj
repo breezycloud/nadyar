@@ -4,10 +4,15 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <ServiceWorkerAssetsManifest>service-worker-assets.js</ServiceWorkerAssetsManifest>
-    <RunAOTCompilation>true</RunAOTCompilation>
-    <WasmStripILAfterAOT>true</WasmStripILAfterAOT>
+    <ServiceWorkerAssetsManifest>service-worker-assets.js</ServiceWorkerAssetsManifest>    
   </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove=".github\**" />
+    <Content Remove=".github\**" />
+    <EmbeddedResource Remove=".github\**" />
+    <None Remove=".github\**" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Bogus" Version="35.3.0" />
@@ -34,10 +39,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Server\Shared.csproj" />
     <NativeFileReference Include="libHarfBuzzSharp.a" />
-  </ItemGroup>
-  
-  <ItemGroup>
-    <None Include=".github\workflows\main.yml" />
   </ItemGroup>
 
 </Project>

@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace Shared.Models
 {
     public class ItemsReportModel
-    {        
+    {                
         public string? ItemName { get; set; }
         public string? Category { get; set; }
         public decimal BuyPrice { get; set; }

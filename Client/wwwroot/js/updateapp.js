@@ -4,8 +4,12 @@ bc.onmessage = function (message) {
         bc.postMessage("skip-waiting");
     }
     if (message && message.data == "reload") {
-        notifyNewVersion();
+        restartApp();
+        bc.postMessage("restarted")
     }
+    if (message && message.data == "notify") {
+        notifyNewVersion();
+    }    
 }
 let dotnetObj;
 window.Updater = {
@@ -19,12 +23,11 @@ window.Updater = {
         }
     }
 }
-function notifyNewVersion() {
-    localStorage.setItem("new-version", true);
-    window.location.reload();
+function notifyNewVersion() {    
     dotnetObj.invokeMethodAsync("Updater.NotifyUpdateAvailable", true);
+    localStorage.setItem("new-version", false);
 }
 function restartApp() {
+    localStorage.setItem("new-version", true);
     window.location.reload();
-    localStorage.setItem("new-version", false);
 }

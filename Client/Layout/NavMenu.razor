@@ -1,6 +1,17 @@
-﻿<MudNavMenu Color="Color.Primary" Margin="Margin.Dense" Rounded="true" Class="pa-2">
+﻿@using Client.Pages.Products
+<MudNavMenu @ref="menu" Color="Color.Primary" Margin="Margin.Dense" Rounded="true" Class="pa-2">
     <MudNavLink Href="/dashboard">Dashboard</MudNavLink>
     <MudNavLink Href="/branches">Branch</MudNavLink>
     <MudNavLink Href="/categories">Categories</MudNavLink>
     <MudNavLink Href="/products">Products</MudNavLink>
+    <MudNavLink OnClick="@(() => OpenDialog())">Reports</MudNavLink>
 </MudNavMenu>
+
+@code {
+    private MudNavMenu menu { get; set; } = new();
+
+    void OpenDialog()
+    {
+        Dialog.Show<ItemReportDialog>();        
+    }
+}

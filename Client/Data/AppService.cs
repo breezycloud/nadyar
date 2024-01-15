@@ -96,12 +96,11 @@ public class AppService : IAppService
         model.Categories = await db.Categories.Count();        
         model.TotalBranches = await db.Branches.Count();
 
-        //model.Items = SoldProducts.GroupBy(x => x.Id).Select(y => new ItemChartModel
-        //                                {
-        //                                    ServiceName = y.Select(i => i.Item!.ItemName)
-        //                                                    .FirstOrDefault(),
-        //                                    SalesCount = y.Select(i => i.ItemId).Count()
-        //                                }).OrderByDescending(x => x.SalesCount).Take(10).ToArray();
+        model.TopSoldCategories = SoldProducts.GroupBy(x => x.Category!.Id).Select(y => new TopSoldCategory
+        {
+            Item = y.Select(i => i.Category!.CategoryName).FirstOrDefault(),
+            Total = y.Sum(x => x.Quantity!.Value)
+        }).OrderByDescending(x => x.Total).Take(10).ToArray();
         model.ItemSales = SoldProducts.SelectMany(x => x.StocksOut!).GroupBy(x => new { x.Date.Year, x.Date.Month }).Select(y => new ItemSalesLine
         {
             Year = y.Key.Year,

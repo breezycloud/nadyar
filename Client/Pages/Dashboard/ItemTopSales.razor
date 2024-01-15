@@ -1,1 +1,53 @@
-﻿
+﻿@if (IsLoading)
+{
+    <MudGrid>
+        <MudItem xs="12">
+            <div class="d-flex justify-center">
+                <MudSkeleton Animation="Animation.Wave" SkeletonType="SkeletonType.Circle" Width="450px" Height="350px" />
+            </div>
+        </MudItem>
+    </MudGrid>
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12">
+            <div class="d-flex justify-center">
+                <MudText Typo="Typo.h5" Class="pa-1" Style="font-weight: 200;">Top Purchase Category</MudText>
+            </div>
+        </MudItem>
+        <MudItem xs="12">
+            <div>
+                <MudChart ChartType="ChartType.Pie" InputData="@data" InputLabels="@XAxisLabels" Width="100%" Height="320px"></MudChart>
+            </div>
+        </MudItem>
+    </MudGrid>
+
+}
+
+@code {
+    public List<ChartSeries> Series = new List<ChartSeries>();
+    private double[] data = { 19, 20, 60 };
+    public string[] XAxisLabels = { "Jan", "Feb", "Mar" };
+    [Parameter, EditorRequired] public bool IsLoading { get; set; } = false;
+    [Parameter, EditorRequired] public TopSoldCategory[] Data { get; set; } = Array.Empty<TopSoldCategory>();
+    protected override async Task OnParametersSetAsync()
+    {
+        await AppendChartData(Data);
+    }
+
+    private async ValueTask AppendChartData(TopSoldCategory[] categories)
+    {
+        var distinct = categories.Select(x => x.Item).Distinct().ToList();
+        XAxisLabels = distinct.ToArray()!;
+        data = new double[distinct.Count];
+        for (int d = 0; d < distinct.Count; d++)
+        {
+            var category = categories.Where(i => i.Item == distinct[d]).FirstOrDefault();
+            data[d] = category!.Total;
+
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+}
