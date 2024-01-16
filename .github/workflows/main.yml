@@ -30,6 +30,6 @@ jobs:
       uses: crazy-max/ghaction-github-pages@v1.5.1
       with:
         target_branch: gh-pages
-        build_dir: ${{ github.workspace }}/Client/bin/Release/net8.0/publish/wwwroot
+        build_dir: Client/bin/Release/net8.0/publish/wwwroot
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
