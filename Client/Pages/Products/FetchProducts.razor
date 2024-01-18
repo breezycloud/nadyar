@@ -18,7 +18,7 @@
 else
 {
     <div class="d-flex flex-row align-center gap-5 justify-space-between pb-2">
-        <MudSelect T="Branch" Margin="Margin.Dense" Dense="true" Class="d-flex align-start justify-center" AnchorOrigin="Origin.BottomCenter" Strict="true" Value="Branch" ValueChanged="BranchChanged" Label="Branch" Variant="Variant.Outlined">
+        <MudSelect T="Branch" Margin="Margin.Dense" Style="@(Branches.Length ==0 ? "visibility:hidden;" : "visibility:visible;")" Dense="true" Class="d-flex align-start justify-center" AnchorOrigin="Origin.BottomCenter" Strict="true" Value="Branch" ValueChanged="BranchChanged" Label="Branch" Variant="Variant.Outlined">
             @foreach (Branch item in Branches)
             {
                 <MudSelectItem Value="@item">@item.BranchName</MudSelectItem>
@@ -107,6 +107,8 @@ else
             return;
         }
         var db = new MyDb(moduleFactory!);
+        await db.Items.Delete(product.Id);
+        AppState.UpdateLayout();
         try
         {            
             SnackBar.Add($"Product successfully deleted!", Severity.Success);
@@ -135,8 +137,11 @@ else
         moduleFactory = new EsModuleFactory(js);
         var db = new MyDb(moduleFactory);
         Branches = await db.Branches.OrderBy("BranchName").ToArray();
-        Branch = Branches.FirstOrDefault();
-        await SearchByBranch(Branch!.Id);        
+        if (Branches.Length > 0)
+        {
+            Branch = Branches.FirstOrDefault();
+            await SearchByBranch(Branch!.Id);
+        }                
     }
 
     async void BranchChanged(Branch branch)

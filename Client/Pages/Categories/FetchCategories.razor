@@ -90,13 +90,11 @@ else
         var moduleFactory = new EsModuleFactory(js);
         var db = new MyDb(moduleFactory);
 
-        category.IsDeleted = true;
-        category.ModifiedDate = DateTime.Now;
         try
         {
-            await db.Categories.Put(category);
+            await db.Categories.Delete(category.Id);
             SnackBar.Add("Category Successfully Deleted", Severity.Success);
-            await OnParametersSetAsync();
+            AppState.UpdateLayout();
         }
         catch
         {

@@ -96,10 +96,10 @@ public class AppService : IAppService
         model.Categories = await db.Categories.Count();        
         model.TotalBranches = await db.Branches.Count();
 
-        model.TopSoldCategories = SoldProducts.GroupBy(x => x.Category!.Id).Select(y => new TopSoldCategory
+        model.TopSoldCategories = SoldProducts.Where(x => x.StocksOut!.Any()).GroupBy(x => x.Category!.Id).Select(y => new TopSoldCategory
         {
             Item = y.Select(i => i.Category!.CategoryName).FirstOrDefault(),
-            Total = y.Sum(x => x.Quantity!.Value)
+            Total = y.SelectMany(x => x.StocksOut!).Sum(x => x.Quantity!.Value)
         }).OrderByDescending(x => x.Total).Take(10).ToArray();
         model.ItemSales = SoldProducts.SelectMany(x => x.StocksOut!).GroupBy(x => new { x.Date.Year, x.Date.Month }).Select(y => new ItemSalesLine
         {
